@@ -29,6 +29,11 @@ fi
 
 OMM_START_PARAMETER=()
 ICS_START_PARAMETER=()
+OMM_START_PARAMETER+=(-http "${OMM_HTTP_PORT:-80}")
+OMM_START_PARAMETER+=(-https "${OMM_HTTPS_PORT:-443}")
+if [ "${OMM_NOROOT+x}" = x ]; then
+    OMM_START_PARAMETER+=(-noroot)
+fi
 if [ -n "$OMM_IF" ]; then
     OMM_START_PARAMETER+=(-i "$OMM_IF")
     ICS_START_PARAMETER+=(-i "$OMM_IF")

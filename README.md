@@ -1,3 +1,4 @@
+
 # phones-omm
 
 A Docker container for running the Mitel OMM SIP-DECT Controller
@@ -50,6 +51,25 @@ services:
 
 Start OMM with:
 `docker compose up -d`
+
+### Environment variables
+
+| Variable | Default | Description |
+| --- | --- | --- |
+| `OMM_HTTP_PORT` | `80` | HTTP listen port for the SIP-DECT web interface. |
+| `OMM_HTTPS_PORT` | `443` | HTTPS listen port for the SIP-DECT web interface. |
+| `OMM_NOROOT` | Unset | Adds `-noroot` when the variable is present (even when empty) |
+
+For example:
+
+```yaml
+services:
+  omm:
+    environment:
+      OMM_HTTP_PORT: 81
+      OMM_HTTPS_PORT: 444
+      OMM_NOROOT: "1"
+```
 
 ## md5sums
 
