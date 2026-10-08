@@ -95,7 +95,7 @@ services:
 | File | md5sum |
 | -- | -- |
 | `SIP-DECT.bin` | `c84ef530256309777926361326562912` |
-`iprfp3G.dnld` | `c68a8a9a74c4b531ae4c37d92ccc2c0e`|
+| `iprfp3G.dnld` | `c68a8a9a74c4b531ae4c37d92ccc2c0e`|
 | `iprfp4G.dnld` | `80d154864b93f50307f9f255c722f32e` |
 
 
