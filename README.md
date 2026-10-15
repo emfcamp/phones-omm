@@ -5,7 +5,8 @@ A Docker container for running the Mitel OMM SIP-DECT Controller
 
 ## Notes
 
-- You have to supply your own OMM binaries (see the md5sums section)
+- You have to supply your own OMM binaries, either as local files or through
+  `OMM_URL` (see the md5sums section)
 - Tested on versions 8.0, 9.1 and 10
 - It replaces the `SIP-DECT.sh` start up script shipped with OMM with a custom, Docker friendly `entrypoint.sh`
 - OMM and ICS logs are written to the `data` volume
@@ -24,7 +25,9 @@ mkdir data
 mkdir config
 mkdir bin
 ```
-Place the `iprfp3G.dnld`,  `iprfp4G.dnld`  and `SIP-DECT.bin` files in the `bin` directory.
+Place the `iprfp3G.dnld`, `iprfp4G.dnld` and `SIP-DECT.bin` files in the `bin`
+directory. Alternatively, leave `bin` empty and set `OMM_URL` as described
+below.
 
 Create `compose.yml` so it looks something like:
 
@@ -40,12 +43,12 @@ services:
       - CAP_SYS_NICE
     security_opt:
       - seccomp=unconfined
+    environment:
+      OMM_URL: ${OMM_URL:-}
     volumes:
       - ./data:/opt/SIP-DECT
       - ./conf:/conf
-      - ./bin/SIP-DECT.bin:/opt/SIP-DECT/SIP-DECT.bin:ro
-      - ./bin/iprfp3G.dnld:/opt/SIP-DECT/iprfp3G.dnld:ro
-      - ./bin/iprfp4G.dnld:/opt/SIP-DECT/iprfp4G.dnld:ro
+      - ./bin:/firmware:ro
     restart: unless-stopped
 ```
 
@@ -59,6 +62,7 @@ Start OMM with:
 | `OMM_HTTP_PORT` | `80` | HTTP listen port for the SIP-DECT web interface. |
 | `OMM_HTTPS_PORT` | `443` | HTTPS listen port for the SIP-DECT web interface. |
 | `OMM_NOROOT` | Unset | Adds `-noroot` when the variable is present (even when empty) |
+| `OMM_URL` | Unset | URL of a SIP-DECT release ZIP. Used when `/opt/SIP-DECT/SIP-DECT.bin` and local firmware are absent. |
 
 For example:
 
@@ -70,6 +74,20 @@ services:
       OMM_HTTPS_PORT: 444
       OMM_NOROOT: "1"
 ```
+
+To download the firmware at first startup instead of putting it in `bin`, set
+the release ZIP URL before starting Compose (the `/firmware` volume may remain
+mounted and empty):
+
+```console
+export OMM_URL="https://downloads.example/SIP-DECT_9.1SP1-JD10/SIP-DECT_9.1SP1-JD10.zip"
+docker compose up -d
+```
+
+The container extracts only `SIP-DECT.bin`, `iprfp3G.dnld` and
+`iprfp4G.dnld`. They must be together either at the archive root or in a
+top-level `SIP-DECT*` directory. The files are stored in the `data` volume, so
+the download is not repeated on later starts.
 
 ## md5sums
 
