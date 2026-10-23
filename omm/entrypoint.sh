@@ -6,7 +6,132 @@ OMM_PID_FILE="/var/run/SIP-DECT.pid"
 ICS_BIN="$OMM_DIR/bin/ics"
 ICS_PID_FILE="/var/run/SIP-ICS.pid"
 
+copy_local_firmware() {
+    local firmware_dir="$1"
+    local filename
+
+    for filename in SIP-DECT.bin iprfp3G.dnld iprfp4G.dnld; do
+        if [ ! -f "$firmware_dir/$filename" ]; then
+            echo "Firmware directory $firmware_dir is missing $filename" >&2
+            return 1
+        fi
+    done
+
+    echo "Copying OMM firmware from $firmware_dir"
+    for filename in SIP-DECT.bin iprfp3G.dnld iprfp4G.dnld; do
+        cp "$firmware_dir/$filename" "$OMM_DIR/$filename" || return 1
+    done
+}
+
+download_firmware() {
+    local work_dir archive member firmware_dir filename wanted found
+    local sip_member=""
+    local iprfp3g_member=""
+    local iprfp4g_member=""
+    local -a members
+
+    for filename in SIP-DECT.bin iprfp3G.dnld iprfp4G.dnld; do
+        if [ -e "$OMM_DIR/$filename" ] && [ ! -f "$OMM_DIR/$filename" ]; then
+            echo "Cannot install firmware: $OMM_DIR/$filename exists but is not a regular file" >&2
+            return 1
+        fi
+    done
+
+    work_dir=$(mktemp -d "$OMM_DIR/.firmware-download.XXXXXX") || return 1
+    archive="$work_dir/firmware.zip"
+
+    echo "SIP-DECT.bin not found; downloading the OMM firmware archive from OMM_URL"
+    if ! wget -q -O "$archive" -- "$OMM_URL"; then
+        echo "Unable to download the OMM firmware archive" >&2
+        rm -f "$archive"
+        rmdir "$work_dir"
+        return 1
+    fi
+
+    if ! unzip -Z1 "$archive" > "$work_dir/members"; then
+        echo "OMM_URL did not return a readable ZIP archive" >&2
+        rm -f "$archive" "$work_dir/members"
+        rmdir "$work_dir"
+        return 1
+    fi
+    mapfile -t members < "$work_dir/members"
+
+    # Releases either put these files at the ZIP root or together inside a
+    # SIP-DECT* directory. Locate SIP-DECT.bin first, then require its siblings.
+    for member in "${members[@]}"; do
+        if [[ "$member" != "SIP-DECT.bin" && ! "$member" =~ ^SIP-DECT[-A-Za-z0-9._+]*/SIP-DECT\.bin$ ]]; then
+            continue
+        fi
+
+        firmware_dir="${member%/*}"
+        if [ "$firmware_dir" = "$member" ]; then
+            firmware_dir=""
+        else
+            firmware_dir="$firmware_dir/"
+        fi
+
+        found=0
+        for wanted in "${firmware_dir}iprfp3G.dnld" "${firmware_dir}iprfp4G.dnld"; do
+            for filename in "${members[@]}"; do
+                if [ "$filename" = "$wanted" ]; then
+                    found=$((found + 1))
+                    break
+                fi
+            done
+        done
+
+        if [ "$found" -eq 2 ]; then
+            sip_member="$member"
+            iprfp3g_member="${firmware_dir}iprfp3G.dnld"
+            iprfp4g_member="${firmware_dir}iprfp4G.dnld"
+            break
+        fi
+    done
+
+    if [ -z "$sip_member" ]; then
+        echo "The archive does not contain SIP-DECT.bin, iprfp3G.dnld and iprfp4G.dnld in the same supported directory" >&2
+        rm -f "$archive" "$work_dir/members"
+        rmdir "$work_dir"
+        return 1
+    fi
+
+    # Extract only the three files that OMM needs, rather than unpacking the
+    # complete release archive.
+    if ! unzip -p "$archive" "$sip_member" > "$work_dir/SIP-DECT.bin" ||
+       ! unzip -p "$archive" "$iprfp3g_member" > "$work_dir/iprfp3G.dnld" ||
+       ! unzip -p "$archive" "$iprfp4g_member" > "$work_dir/iprfp4G.dnld"; then
+        echo "Unable to extract OMM firmware from the archive" >&2
+        rm -f "$work_dir/SIP-DECT.bin" "$work_dir/iprfp3G.dnld" "$work_dir/iprfp4G.dnld" "$archive" "$work_dir/members"
+        rmdir "$work_dir"
+        return 1
+    fi
+
+    for filename in SIP-DECT.bin iprfp3G.dnld iprfp4G.dnld; do
+        if ! mv "$work_dir/$filename" "$OMM_DIR/$filename"; then
+            echo "Unable to store $filename in $OMM_DIR" >&2
+            rm -f "$work_dir/SIP-DECT.bin" "$work_dir/iprfp3G.dnld" "$work_dir/iprfp4G.dnld" "$archive" "$work_dir/members"
+            rmdir "$work_dir"
+            return 1
+        fi
+    done
+    rm -f "$archive" "$work_dir/members"
+    rmdir "$work_dir"
+    echo "OMM firmware downloaded successfully"
+}
+
+if [ ! -f "$OMM_DIR/SIP-DECT.bin" ]; then
+    if [ -f /firmware/SIP-DECT.bin ]; then
+        copy_local_firmware /firmware || exit 4
+    elif [ -n "${OMM_URL:-}" ]; then
+        download_firmware || exit 4
+    fi
+fi
+
 if [ ! -x "$OMM_DIR/bin/SIP-DECT.sh" ]; then
+    if [ ! -f "$OMM_DIR/SIP-DECT.bin" ]; then
+        echo "SIP-DECT.bin not found; mount the firmware files or set OMM_URL to a release ZIP URL" >&2
+        exit 4
+    fi
     sh "$OMM_DIR/SIP-DECT.bin"
 fi
 

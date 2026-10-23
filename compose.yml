@@ -9,10 +9,10 @@ services:
       - CAP_SYS_NICE
     security_opt:
       - seccomp=unconfined
+    environment:
+      OMM_URL: ${OMM_URL:-}
     volumes:
       - ./data:/opt/SIP-DECT
       - ./conf:/conf
-      - ./bin/SIP-DECT.bin:/opt/SIP-DECT/SIP-DECT.bin:ro
-      - ./bin/iprfp3G.dnld:/opt/SIP-DECT/iprfp3G.dnld:ro
-      - ./bin/iprfp4G.dnld:/opt/SIP-DECT/iprfp4G.dnld:ro
+      - ./bin:/firmware:ro
     restart: unless-stopped  
